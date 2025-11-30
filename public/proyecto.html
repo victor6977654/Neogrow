@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Vista del Proyecto</title>
+
+<style>
+iframe {
+    width: 100%;
+    height: 95vh;
+    border: none;
+}
+</style>
+
+</head>
+<body>
+
+<iframe id="frame"></iframe>
+
+<script>
+async function cargar() {
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+
+    const res = await fetch("/api/proyecto/" + id);
+    const data = await res.json();
+
+    let iframe = document.getElementById("frame").contentWindow.document;
+    iframe.open();
+    iframe.write(data.html);
+    iframe.close();
+}
+
+cargar();
+</script>
+
+</body>
+</html>
