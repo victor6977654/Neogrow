@@ -2,56 +2,107 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Foro Lotes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foro Render</title>
 <style>
-body { background:#111; color:#fff; font-family:sans-serif; }
-#speedbox {
-  position: fixed; top: 10px; right: 10px;
-  background: #000a; color: #0f0;
-  padding: 10px; border-radius: 6px;
-  font-family: monospace;
-}
-input { width:70%; padding:10px; }
-button { padding:10px; background:#0f0; color:#000; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #ffffff;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+    header {
+        background: #ffffff;
+        padding: 10px;
+        text-align: right;
+        border-bottom: 1px solid #ccc;
+        font-size: 14px;
+    }
+    #chat {
+        flex: 1;
+        overflow-y: scroll;
+        padding: 15px;
+    }
+    #form-area {
+        display: flex;
+        padding: 10px;
+        border-top: 1px solid #ccc;
+        background: #ffffff;
+    }
+    input, textarea, button {
+        outline: none;
+        border: 1px solid #aaa;
+        padding: 6px;
+        border-radius: 4px;
+    }
+    #nameBox {
+        width: 120px;
+        margin-right: 10px;
+    }
+    #messageBox {
+        flex: 1;
+        height: 50px;
+        resize: none;
+        margin-right: 10px;
+    }
 </style>
 </head>
+
 <body>
 
-<h2>Foro</h2>
+<header>
+    <span id="speed">⬆️ 0.0MB/s ⬇️ 0.0MB/s</span>
+</header>
 
-<div id="speedbox">⬆️ 0.00MB/s ⬇️ 0.00MB/s</div>
+<div id="chat"></div>
 
-<input id="msg" placeholder="mensaje...">
-<button onclick="send()">Enviar</button>
-
-<ul id="chat"></ul>
+<div id="form-area">
+    <input id="nameBox" type="text" placeholder="Tu nombre">
+    <textarea id="messageBox" placeholder="Escribe un mensaje..."></textarea>
+    <button id="sendBtn">Enviar</button>
+</div>
 
 <script>
-const ws = new WebSocket(`wss://${location.host}`);
-
-ws.onmessage = e => {
-  const data = JSON.parse(e.data);
-  if (data.type === "message") {
-    const li = document.createElement("li");
-    li.textContent = data.msg.text;
-    document.getElementById("chat").appendChild(li);
-  }
-  if (data.type === "speed") {
-    document.getElementById("speedbox").innerHTML =
-      `⬆️ ${data.up}MB/s ⬇️ ${data.down}MB/s`;
-  }
-};
-
-async function send() {
-  const t = document.getElementById("msg").value;
-  if (!t.trim()) return;
-  await fetch("/message", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: t })
-  });
-  document.getElementById("msg").value = "";
+function loadName() {
+    const saved = localStorage.getItem("username");
+    if (saved) document.getElementById("nameBox").value = saved;
 }
+
+function saveName() {
+    const name = document.getElementById("nameBox").value.trim();
+    if (name) localStorage.setItem("username", name);
+}
+
+document.getElementById("sendBtn").addEventListener("click", sendMessage);
+
+function sendMessage() {
+    const name = document.getElementById("nameBox").value.trim();
+    const msg = document.getElementById("messageBox").value.trim();
+    if (!name || !msg) return;
+
+    saveName();
+
+    fetch("/send-message", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ name, text: msg })
+    })
+    .then(res => res.json())
+    .then(data => {
+        updateSpeed(data.upload_mb_s, data.download_mb_s);
+    });
+
+    document.getElementById("messageBox").value = "";
+}
+
+function updateSpeed(up, down) {
+    document.getElementById("speed").innerText = `⬆️ ${up} ⬇️ ${down}`;
+}
+
+loadName();
 </script>
 
 </body>
