@@ -1,54 +1,79 @@
 const express = require("express");
+const bodyParser = require("body-parser");
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT; // Render exige esto
+const PORT = process.env.PORT || 3001;
+const DATA_DIR = path.join(__dirname, "data");
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+
+app.use(bodyParser.json({ limit: "10mb" }));
 app.use(express.static("public"));
+app.use("/data", express.static("data"));
 
-const DATA_PATH = path.join(__dirname, "proyectos.json");
+// ✔ Sincroniza solo los archivos faltantes desde PHP
+async function syncFiles() {
+  try {
+    const { data: fileList } = await axios.get(
+      "https://pelermore.unaux.com/proyect-node/down.php"
+    );
 
-function leerProyectos() {
-    if (!fs.existsSync(DATA_PATH)) return [];
-    return JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
-}
+    if (!Array.isArray(fileList)) return;
 
-function guardarProyectos(data) {
-    fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-}
+    for (const file of fileList) {
+      const filePath = path.join(DATA_DIR, file);
 
-app.get("/api/proyectos", (req, res) => {
-    res.json(leerProyectos());
-});
+      if (!fs.existsSync(filePath)) {
+        console.log("Descargando:", file);
 
-app.post("/api/proyectos", (req, res) => {
-    const { nombre, descripcion, html } = req.body;
-
-    if (!nombre || !html) {
-        return res.status(400).json({ error: "Faltan campos" });
+        const res = await axios.get(
+          "https://pelermore.unaux.com/proyect-node/down.php?file=" + file,
+          { responseType: "arraybuffer" }
+        );
+        fs.writeFileSync(filePath, res.data);
+      }
     }
+  } catch(e) {
+    console.log("Sincronización fallida:", e.message);
+  }
+}
 
-    const proyectos = leerProyectos();
-    proyectos.push({ id: Date.now(), nombre, descripcion, html });
+syncFiles();
 
-    guardarProyectos(proyectos);
+// API crear proyecto
+app.post("/api/proyecto", async (req, res) => {
+  const { nombre, descripcion, contenido } = req.body;
 
-    res.json({ ok: true });
+  if (!nombre || !contenido)
+    return res.json({ error: "Nombre y contenido requeridos" });
+
+  const fileName = nombre.replace(/[^a-zA-Z0-9]/gi, "_").toLowerCase() + ".html";
+  const filePath = path.join(DATA_DIR, fileName);
+
+  fs.writeFileSync(filePath, contenido);
+
+  try {
+    await axios.post("https://pelermore.unaux.com/proyect-node/up.php", {
+      nombre: fileName,
+      descripcion,
+      contenido
+    });
+  } catch (e) {
+    console.log("Error subiendo a PHP:", e.message);
+  }
+
+  res.json({ success: true, file: fileName });
 });
 
-app.get("/api/proyecto/:id", (req, res) => {
-    const proyectos = leerProyectos();
-    const proyecto = proyectos.find(p => p.id == req.params.id);
-
-    if (!proyecto)
-        return res.status(404).json({ error: "No encontrado" });
-
-    res.json(proyecto);
+// API lista proyectos
+app.get("/api/listar", (req, res) => {
+  const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith(".html"));
+  res.json(files);
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log("Seevidor lanzado en https://neogrow.onrender.com/");
-});
+app.listen(PORT, "0.0.0.0", () =>
+  console.log(`Servidor listo en 0.0.0.0:${PORT}`)
+);
