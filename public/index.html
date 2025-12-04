@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Gestor de Proyectos</title>
+<style>
+  button {
+    background: #007bff;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #lista {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #444;
+  }
+</style>
+</head>
+<body>
+
+<h2>Crear proyecto</h2>
+
+<button onclick="crear()">Crear proyecto</button><br><br>
+
+<textarea id="html" cols="50" rows="10" placeholder="HTML del proyecto"></textarea>
+
+<h3>Proyectos creados</h3>
+<div id="lista">Cargando...</div>
+
+<script>
+function crear() {
+  let nombre = prompt("Nombre del proyecto:");
+  if (!nombre) return;
+  let descripcion = prompt("Descripción del proyecto:") || "";
+  let contenido = document.getElementById("html").value;
+
+  fetch("/api/proyecto", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ nombre, descripcion, contenido })
+  }).then(r => r.json()).then(() => cargar());
+}
+
+function cargar() {
+  fetch("/api/listar")
+  .then(r => r.json())
+  .then(lista => {
+    document.getElementById("lista").innerHTML =
+      lista.map(f => `<a href="/data/${f}" target="_blank">${f}</a>`).join("<br>");
+  });
+}
+
+cargar();
+</script>
+
+</body>
+  </html>
