@@ -1,11 +1,15 @@
 {
-  "name": "editor-web",
+  "name": "render-project-manager",
   "version": "1.0.0",
+  "description": "Gestor de proyectos Render + servidor PHP externo",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "axios": "^1.7.2",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "body-parser": "^1.20.2"
   }
 }
