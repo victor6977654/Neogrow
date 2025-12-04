@@ -1,79 +1,95 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
+const WebSocket = require("ws");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const DATA_DIR = path.join(__dirname, "data");
-
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-
-app.use(bodyParser.json({ limit: "10mb" }));
+app.use(express.json());
 app.use(express.static("public"));
-app.use("/data", express.static("data"));
 
-// ✔ Sincroniza solo los archivos faltantes desde PHP
-async function syncFiles() {
+const REMOTE_SUBMIT = "https://pelermore.unaux.com/proyecto-nodejs/submit-d.php";
+const REMOTE_LIST = "https://pelermore.unaux.com/proyecto-nodejs/list-lotes.php";
+
+let MESSAGES = [];
+let BATCH_ID = 1;
+let lastUp = 0, lastDown = 0;
+
+// WebSockets
+const server = app.listen(process.env.PORT || 3000, "0.0.0.0", () => {
+  console.log("🟢 Servidor online");
+  restoreFromRemote();
+});
+
+const wss = new WebSocket.Server({ server });
+
+// ---------------- RESTAURAR LOTES ----------------
+async function restoreFromRemote() {
   try {
-    const { data: fileList } = await axios.get(
-      "https://pelermore.unaux.com/proyect-node/down.php"
-    );
+    const res = await axios.get(REMOTE_LIST);
+    const files = res.data.files || [];
 
-    if (!Array.isArray(fileList)) return;
+    console.log("📥 Restaurando lotes:", files.length);
 
-    for (const file of fileList) {
-      const filePath = path.join(DATA_DIR, file);
-
-      if (!fs.existsSync(filePath)) {
-        console.log("Descargando:", file);
-
-        const res = await axios.get(
-          "https://pelermore.unaux.com/proyect-node/down.php?file=" + file,
-          { responseType: "arraybuffer" }
-        );
-        fs.writeFileSync(filePath, res.data);
-      }
+    for (const file of files) {
+      const lote = await axios.get(
+        `https://pelermore.unaux.com/proyecto-nodejs/${file}`
+      );
+      MESSAGES.push(...lote.data.messages);
+      BATCH_ID = Math.max(BATCH_ID, lote.data.batch + 1);
+      console.log(`🔄 Restaurado ${file}`);
     }
-  } catch(e) {
-    console.log("Sincronización fallida:", e.message);
+
+    console.log("✔ Restauración completa");
+
+  } catch (err) {
+    console.log("⚠ Error restaurando:", err.message);
   }
 }
 
-syncFiles();
-
-// API crear proyecto
-app.post("/api/proyecto", async (req, res) => {
-  const { nombre, descripcion, contenido } = req.body;
-
-  if (!nombre || !contenido)
-    return res.json({ error: "Nombre y contenido requeridos" });
-
-  const fileName = nombre.replace(/[^a-zA-Z0-9]/gi, "_").toLowerCase() + ".html";
-  const filePath = path.join(DATA_DIR, fileName);
-
-  fs.writeFileSync(filePath, contenido);
+// ---------------- SUBIR LOTES ----------------
+async function submitBatch() {
+  const payload = {
+    batch: BATCH_ID,
+    messages: [...MESSAGES]
+  };
 
   try {
-    await axios.post("https://pelermore.unaux.com/proyect-node/up.php", {
-      nombre: fileName,
-      descripcion,
-      contenido
+    const res = await axios.post(REMOTE_SUBMIT, payload);
+    lastUp = res.data.upSpeed || 0;
+    lastDown = res.data.downSpeed || 0;
+
+    broadcast({
+      type: "speed",
+      up: lastUp.toFixed(2),
+      down: lastDown.toFixed(2)
     });
+
+    console.log(`📤 Subido lote ${BATCH_ID}`);
+    MESSAGES = [];
+    BATCH_ID++;
+
   } catch (e) {
-    console.log("Error subiendo a PHP:", e.message);
+    console.log("❌ Falló subida lote");
   }
+}
 
-  res.json({ success: true, file: fileName });
+// ---------------- CHAT ----------------
+app.post("/message", (req, res) => {
+  const msg = {
+    text: req.body.text,
+    time: Date.now()
+  };
+
+  MESSAGES.push(msg);
+  broadcast({ type: "message", msg });
+
+  if (MESSAGES.length >= 10) submitBatch();
+
+  res.json({ status: "ok" });
 });
 
-// API lista proyectos
-app.get("/api/listar", (req, res) => {
-  const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith(".html"));
-  res.json(files);
-});
-
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(`Servidor listo en 0.0.0.0:${PORT}`)
-);
+// Broadcast WS
+function broadcast(data) {
+  wss.clients.forEach(c => {
+    if (c.readyState === WebSocket.OPEN) c.send(JSON.stringify(data));
+  });
+}
