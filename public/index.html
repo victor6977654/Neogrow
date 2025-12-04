@@ -2,59 +2,57 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Gestor de Proyectos</title>
+<title>Foro Lotes</title>
 <style>
-  button {
-    background: #007bff;
-    color: white;
-    padding: 10px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  #lista {
-    margin-top: 20px;
-    padding: 10px;
-    border: 1px solid #444;
-  }
+body { background:#111; color:#fff; font-family:sans-serif; }
+#speedbox {
+  position: fixed; top: 10px; right: 10px;
+  background: #000a; color: #0f0;
+  padding: 10px; border-radius: 6px;
+  font-family: monospace;
+}
+input { width:70%; padding:10px; }
+button { padding:10px; background:#0f0; color:#000; }
 </style>
 </head>
 <body>
 
-<h2>Crear proyecto</h2>
+<h2>Foro</h2>
 
-<button onclick="crear()">Crear proyecto</button><br><br>
+<div id="speedbox">⬆️ 0.00MB/s ⬇️ 0.00MB/s</div>
 
-<textarea id="html" cols="50" rows="10" placeholder="HTML del proyecto"></textarea>
+<input id="msg" placeholder="mensaje...">
+<button onclick="send()">Enviar</button>
 
-<h3>Proyectos creados</h3>
-<div id="lista">Cargando...</div>
+<ul id="chat"></ul>
 
 <script>
-function crear() {
-  let nombre = prompt("Nombre del proyecto:");
-  if (!nombre) return;
-  let descripcion = prompt("Descripción del proyecto:") || "";
-  let contenido = document.getElementById("html").value;
+const ws = new WebSocket(`wss://${location.host}`);
 
-  fetch("/api/proyecto", {
+ws.onmessage = e => {
+  const data = JSON.parse(e.data);
+  if (data.type === "message") {
+    const li = document.createElement("li");
+    li.textContent = data.msg.text;
+    document.getElementById("chat").appendChild(li);
+  }
+  if (data.type === "speed") {
+    document.getElementById("speedbox").innerHTML =
+      `⬆️ ${data.up}MB/s ⬇️ ${data.down}MB/s`;
+  }
+};
+
+async function send() {
+  const t = document.getElementById("msg").value;
+  if (!t.trim()) return;
+  await fetch("/message", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ nombre, descripcion, contenido })
-  }).then(r => r.json()).then(() => cargar());
-}
-
-function cargar() {
-  fetch("/api/listar")
-  .then(r => r.json())
-  .then(lista => {
-    document.getElementById("lista").innerHTML =
-      lista.map(f => `<a href="/data/${f}" target="_blank">${f}</a>`).join("<br>");
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: t })
   });
+  document.getElementById("msg").value = "";
 }
-
-cargar();
 </script>
 
 </body>
-  </html>
+</html>
