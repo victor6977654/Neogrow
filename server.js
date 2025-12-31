@@ -1,172 +1,176 @@
 const express = require("express");
-const ftp = require("basic-ftp");
-const fs = require("fs-extra");
 const path = require("path");
+const fs = require("fs-extra");
+const ftp = require("basic-ftp");
 const axios = require("axios");
 const mime = require("mime-types");
 const { Client } = require("ssh2");
 
-const app = express();
-const HOST = "0.0.0.0";
-const PORT = process.env.PORT || 3000;
-
 const INFO_URL = "https://neogrow.unaux.com/files/node/info.json";
 
-const BASE_DIR = path.join(__dirname, "public");
-const FILES_DIR = path.join(BASE_DIR, "node-files");
-const LOG_DIR = path.join(BASE_DIR, "register");
+const BASE_DIR = __dirname;
+const PUBLIC_DIR = path.join(BASE_DIR, "public");
+const FILES_DIR = path.join(PUBLIC_DIR, "node-files");
+const REGISTER_DIR = path.join(PUBLIC_DIR, "register");
 
-let CONFIG = null;
+const app = express();
 
-// Crear carpetas
+/* ===============================
+   CREAR CARPETAS NECESARIAS
+================================ */
 fs.ensureDirSync(FILES_DIR);
-fs.ensureDirSync(LOG_DIR);
+fs.ensureDirSync(REGISTER_DIR);
 
-/* ------------------ CARGAR CONFIG ------------------ */
+/* ===============================
+   UTILIDADES
+================================ */
+function randomName() {
+  return `${Math.floor(Math.random() * 99999)}-${new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-")}.txt`;
+}
+
+async function saveLog(file, status) {
+  const logFile = path.join(REGISTER_DIR, randomName());
+  const content = `
+Fecha: ${new Date().toString()}
+Archivo: ${file}
+Estado: ${status}
+`;
+  await fs.writeFile(logFile, content);
+}
+
+/* ===============================
+   CARGAR INFO.JSON
+================================ */
 async function loadConfig() {
-  const res = await axios.get(INFO_URL, { timeout: 8000 });
+  const res = await axios.get(INFO_URL, { timeout: 10000 });
   return res.data;
 }
 
-/* ------------------ VPN SSH ------------------ */
-function startVPN(vpn) {
-  return new Promise((resolve, reject) => {
-    const conn = new Client();
-
-    conn.on("ready", () => {
-      conn.forwardIn("127.0.0.1", 2121, err => {
-        if (err) return reject(err);
-        console.log("🔐 VPN SSH activa");
-        resolve();
-      });
-    });
-
-    conn.on("tcp connection", (info, accept) => {
-      const stream = accept();
-      conn.forwardOut(
-        info.srcIP,
-        info.srcPort,
-        "127.0.0.1",
-        21,
-        (err, upstream) => {
-          if (err) return;
-          stream.pipe(upstream);
-          upstream.pipe(stream);
-        }
-      );
-    });
-
-    conn.connect({
-      host: vpn.host,
-      port: vpn.port,
-      username: vpn.user,
-      password: vpn.password
-    });
+/* ===============================
+   TUNEL SSH (OPCIONAL)
+================================ */
+async function connectVPN(vpn) {
+  return new Promise((resolve) => {
+    try {
+      const conn = new Client();
+      conn
+        .on("ready", () => {
+          console.log("🔐 VPN SSH conectada");
+          resolve(conn);
+        })
+        .on("error", () => {
+          console.log("⚠️ VPN SSH falló, continuando sin VPN");
+          resolve(null);
+        })
+        .connect({
+          host: vpn.host,
+          port: vpn.port,
+          username: vpn.user,
+          password: vpn.password,
+        });
+    } catch {
+      resolve(null);
+    }
   });
 }
 
-/* ------------------ REGISTRO ------------------ */
-async function saveLog(file, ip, status) {
-  const now = new Date();
-  const stamp = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
-  const rand = Math.floor(Math.random() * 1000000);
-
-  const logFile = path.join(LOG_DIR, `${rand}-${stamp}.txt`);
-
-  const content = `
-Archivo: ${file}
-Fecha: ${now.toLocaleDateString()}
-Hora: ${now.toLocaleTimeString()}
-IP: ${ip}
-Estado: ${status}
-`;
-
-  await fs.writeFile(logFile, content.trim());
-}
-
-/* ------------------ DESCARGA FTP ------------------ */
-async function downloadFromFTP(remoteFile, localFile) {
+/* ===============================
+   DESCARGA FTP
+================================ */
+async function downloadFromFTP(cfg, remotePath, localPath) {
   const client = new ftp.Client();
-  let downloaded = 0;
-  let last = 0;
+  client.ftp.verbose = false;
 
-  await fs.ensureDir(path.dirname(localFile));
-  await client.access(CONFIG.ftp);
+  try {
+    await client.access({
+      host: cfg.host,
+      port: cfg.port,
+      user: cfg.user,
+      password: cfg.password,
+      secure: cfg.secure,
+    });
 
-  client.trackProgress(info => downloaded = info.bytesOverall);
-
-  const interval = setInterval(() => {
-    const speed = (downloaded - last) / 1024;
-    last = downloaded;
-    process.stdout.write(`\r⬆️ 0.0 kb/s ⬇️ ${speed.toFixed(1)} kb/s`);
-  }, 1000);
-
-  await client.downloadTo(localFile, remoteFile);
-
-  clearInterval(interval);
-  process.stdout.write("\r⬆️ 0.0 kb/s ⬇️ 0.0 kb/s\n");
-  client.close();
+    await fs.ensureDir(path.dirname(localPath));
+    await client.downloadTo(localPath, remotePath);
+    client.close();
+  } catch (e) {
+    client.close();
+    throw e;
+  }
 }
 
-/* ------------------ ROUTER ------------------ */
+/* ===============================
+   RUTA /
+================================ */
+app.get("/", (req, res) => {
+  req.url = "/index.html";
+  app._router.handle(req, res);
+});
+
+/* ===============================
+   RUTA GLOBAL
+================================ */
 app.get("*", async (req, res) => {
   let reqPath = req.path.replace(/^\/+/, "");
 
-if (!reqPath || reqPath === "") {
-  reqPath = "index.html";
-}
-  
-
-  const localFile = path.join(FILES_DIR, reqPath);
-  const remoteFile = `${CONFIG.ftp.baseDir}/${reqPath}`;
-
-  // Ya existe
-  if (await fs.pathExists(localFile)) {
-    return res.sendFile(localFile);
+  if (!reqPath || reqPath === "") {
+    reqPath = "index.html";
   }
 
-  // Descargar
+  if (reqPath.includes("..")) {
+    return res.status(403).send("Acceso denegado");
+  }
+
+  const localFile = path.join(FILES_DIR, reqPath);
+
   try {
-    console.log(`⬇️ Descargando ${remoteFile}`);
-    await downloadFromFTP(remoteFile, localFile);
-    await saveLog(reqPath, req.ip, "DESCARGA_OK");
+    const config = await loadConfig();
+
+    if (!config.License) {
+      return res
+        .status(503)
+        .send("Servidor en mantenimiento (License=false)");
+    }
+
+    // cache
+    if (await fs.pathExists(localFile)) {
+      res.setHeader(
+        "Content-Type",
+        mime.lookup(localFile) || "application/octet-stream"
+      );
+      return res.sendFile(localFile);
+    }
+
+    // VPN opcional
+    if (config.vpn === true) {
+      await connectVPN(config.VPN);
+    }
+
+    const remoteFile = `/node-files/${reqPath}`;
+
+    console.log(`⬇️ Descargando ${reqPath}`);
+    await downloadFromFTP(config.FTP, remoteFile, localFile);
+
+    await saveLog(reqPath, "DESCARGA_OK");
 
     res.setHeader(
       "Content-Type",
       mime.lookup(localFile) || "application/octet-stream"
     );
     return res.sendFile(localFile);
-
   } catch (err) {
-    await saveLog(reqPath, req.ip, "FALLO / NO EXISTE");
+    await saveLog(reqPath, "FALLO_DESCARGA");
     return res.status(404).send("404 - Archivo no encontrado");
   }
 });
 
-/* ------------------ START ------------------ */
-async function start() {
-  try {
-    CONFIG = await loadConfig();
-    console.log("📄 info.json cargado");
-  } catch {
-    app.get("*", (_, res) => res.send("Servidor en mantenimiento"));
-    return app.listen(PORT, HOST);
-  }
+/* ===============================
+   INICIAR SERVIDOR
+================================ */
+const PORT = process.env.PORT || 3000;
 
-  if (!CONFIG.license) {
-    app.get("*", (_, res) => res.send("Servidor en mantenimiento"));
-    return app.listen(PORT, HOST);
-  }
-
-  if (CONFIG.vpn === true) {
-    await startVPN(CONFIG.vpnConfig);
-    CONFIG.ftp.host = "127.0.0.1";
-    CONFIG.ftp.port = 2121;
-  }
-
-  app.listen(PORT, HOST, () => {
-    console.log(`🌍 Server activo en ${HOST}:${PORT}`);
-  });
-}
-
-start();
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server escuchando en 0.0.0.0:${PORT}`);
+});
