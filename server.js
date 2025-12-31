@@ -110,8 +110,12 @@ async function downloadFromFTP(remoteFile, localFile) {
 
 /* ------------------ ROUTER ------------------ */
 app.get("*", async (req, res) => {
-  const reqPath = req.path.replace(/^\/+/, "");
-  if (!reqPath) return res.status(400).end();
+  let reqPath = req.path.replace(/^\/+/, "");
+
+if (!reqPath || reqPath === "") {
+  reqPath = "index.html";
+}
+  
 
   const localFile = path.join(FILES_DIR, reqPath);
   const remoteFile = `${CONFIG.ftp.baseDir}/${reqPath}`;
