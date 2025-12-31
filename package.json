@@ -1,8 +1,9 @@
 {
   "name": "node-ftp-cache-server",
   "version": "1.0.0",
-  "description": "Servidor Node.js que descarga archivos bajo demanda por FTP con VPN opcional y registro",
+  "description": "Servidor Node que descarga archivos por FTP bajo demanda y los sirve como cache",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
@@ -13,5 +14,8 @@
     "fs-extra": "^11.2.0",
     "mime-types": "^2.1.35",
     "ssh2": "^1.15.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
