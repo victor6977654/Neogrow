@@ -1,46 +1,16 @@
-import express from "express";
-import compression from "compression";
-import path from "path";
-import { fileURLToPath } from "url";
-
+// server.js
+const express = require('express');
 const app = express();
 
-// Render / host define el puerto automáticamente
+// Puerto asignado por Render o 3000 por defecto
 const PORT = process.env.PORT || 3000;
-const HOST = "0.0.0.0";
 
-// Para __dirname en ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// 🔥 Compresión gzip / brotli
-app.use(compression());
-
-// ⚡ Cache agresivo para archivos estáticos
-app.use(
-  "/public",
-  express.static(path.join(__dirname, "public"), {
-    maxAge: "1y",
-    immutable: true,
-    etag: false
-  })
-);
-
-// 🚀 Index servido directo y rápido
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"), {
-    headers: {
-      "Cache-Control": "no-store"
-    }
-  });
+// Middleware para mostrar mensaje de mantenimiento
+app.get('*', (req, res) => {
+  res.status(503).send('<h1>Server in Maintenance</h1><p>We are currently updating the server. Please try again later.</p>');
 });
 
-// ❌ 404 ligero
-app.use((req, res) => {
-  res.status(404).send("404 Not Found");
-});
-
-// 🟢 Start
-app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
+// Iniciar servidor
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} in maintenance mode`);
 });
