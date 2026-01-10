@@ -1,119 +1,195 @@
-// =====================
-// IMPORTS
-// =====================
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const unzipper = require('unzipper');
-const express = require('express');
-const basicAuth = require('basic-auth');
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
+const express = require("express");
+const unzipper = require("unzipper");
+const crypto = require("crypto");
 
-// =====================
-// CONFIG
-// =====================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const PUBLIC_DIR = path.join(__dirname, 'public_html');
-const PRIVATE_DIR = path.join(__dirname, 'private_html');
+/* ===============================
+   CONFIGURACIÓN BÁSICA
+================================ */
 
-const LASTED_ZIP = 'https://anarquist.ps.fhgdps.com/download/lasted.zip';
-const PRIV_ZIP   = 'https://anarquist.ps.fhgdps.com/download/priv.zip';
+const PUBLIC_USER = "admin";
+const PUBLIC_PASS = "admin123";
 
-// =====================
-// CREAR CARPETAS
-// =====================
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
+/* Semilla interna (NO es la key) */
+const SERVER_CORE_SEED =
+"NEOGROW_INTERNAL_NODE_CORE_2026_X9A";
 
-ensureDir(PUBLIC_DIR);
-ensureDir(PRIVATE_DIR);
+/* Rutas */
+const ROOT = __dirname;
+const PUBLIC_DIR = path.join(ROOT, "public_html");
+const PRIVATE_DIR = path.join(ROOT, "private_html");
+const KEY_PATH = path.join(ROOT, "key-node.key");
 
-// =====================
-// DESCARGA + EXTRACCIÓN
-// =====================
-function downloadAndExtract(url, dest, name) {
-  log(`Descargando ${name}...`);
-  https.get(url, res => {
-    res
-      .pipe(unzipper.Extract({ path: dest }))
-      .on('close', () => log(`${name} extraído correctamente`))
-      .on('error', err => log(`ERROR ${name}: ${err.message}`));
-  }).on('error', err => log(`ERROR descarga: ${err.message}`));
-}
+/* Zips */
+const LASTED_ZIP = "https://anarquist.ps.fhgdps.com/download/lasted.zip";
+const PRIV_ZIP   = "https://anarquist.ps.fhgdps.com/download/priv.zip";
 
-// =====================
-// CONSOLA SSE
-// =====================
-let clients = [];
+/* ===============================
+   UTILIDADES
+================================ */
 
 function log(msg) {
-  const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  const line = `[${new Date().toISOString()}] ${msg}`;
   console.log(line);
   clients.forEach(res => res.write(`data: ${line}\n\n`));
 }
 
-// =====================
-// AUTH ADMIN
-// =====================
-if (!fs.existsSync('./key-node.key')) {
-  console.error('FALTA key-node.key');
-  process.exit(1);
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-const key = JSON.parse(fs.readFileSync('./key-node.key'));
+function download(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    https.get(url, res => {
+      res.pipe(file);
+      file.on("finish", () => file.close(resolve));
+    }).on("error", reject);
+  });
+}
 
-function auth(req, res, next) {
-  const creds = basicAuth(req);
-  if (!creds || creds.name !== key.user || creds.pass !== key.password) {
-    res.set('WWW-Authenticate', 'Basic realm="Neogrow Admin"');
-    return res.status(401).send('Acceso denegado');
+function unzip(zip, dest) {
+  return fs.createReadStream(zip)
+    .pipe(unzipper.Extract({ path: dest }))
+    .promise();
+}
+
+/* ===============================
+   VALIDACIÓN DE KEY (EXTENSIÓN)
+================================ */
+
+function validateKey(key) {
+  if (!key || !key.id || !key.signature) return false;
+
+  const base =
+    key.id +
+    key.nonce +
+    SERVER_CORE_SEED;
+
+  const hash = crypto
+    .createHash("sha256")
+    .update(base)
+    .digest("hex");
+
+  return hash.startsWith(key.signature);
+}
+
+/* ===============================
+   ARRANQUE
+================================ */
+
+(async () => {
+  ensureDir(PUBLIC_DIR);
+  ensureDir(PRIVATE_DIR);
+
+  if (!fs.existsSync(path.join(PUBLIC_DIR, "lasted"))) {
+    log("Descargando lasted.zip");
+    await download(LASTED_ZIP, "lasted.zip");
+    await unzip("lasted.zip", PUBLIC_DIR);
+    fs.unlinkSync("lasted.zip");
+    log("lasted.zip listo");
   }
+
+  if (!fs.existsSync(path.join(PRIVATE_DIR, "index.html"))) {
+    log("Descargando priv.zip");
+    await download(PRIV_ZIP, "priv.zip");
+    await unzip("priv.zip", ROOT);
+    fs.unlinkSync("priv.zip");
+    log("priv.zip listo");
+  }
+
+  log("Servidor iniciado correctamente");
+})();
+
+/* ===============================
+   MIDDLEWARE
+================================ */
+
+app.use(express.json());
+app.use(express.static(PUBLIC_DIR));
+
+/* ===============================
+   AUTH SIMPLE
+================================ */
+
+function basicAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth) return res.status(401).end();
+
+  const [user, pass] = Buffer
+    .from(auth.split(" ")[1], "base64")
+    .toString()
+    .split(":");
+
+  if (user !== PUBLIC_USER || pass !== PUBLIC_PASS)
+    return res.status(403).end();
+
   next();
 }
 
-// =====================
-// RUTAS
-// =====================
-app.use(express.static(PUBLIC_DIR));
+/* ===============================
+   ADMIN PANEL
+================================ */
 
-app.get('/admin/panel', auth, (req, res) => {
-  res.sendFile(path.join(PRIVATE_DIR, 'panel.html'));
+app.use("/admin/panel", basicAuth, (req, res) => {
+  if (!fs.existsSync(KEY_PATH))
+    return res.status(403).send("Key no encontrada");
+
+  const key = JSON.parse(fs.readFileSync(KEY_PATH));
+  if (!validateKey(key))
+    return res.status(403).send("Key inválida");
+
+  res.sendFile(path.join(PRIVATE_DIR, "index.html"));
 });
 
-// Consola del servidor (read-only)
-app.get('/admin/console', auth, (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
+/* ===============================
+   CONSOLA (SSE)
+================================ */
+
+let clients = [];
+
+app.get("/admin/console", basicAuth, (req, res) => {
+  if (!fs.existsSync(KEY_PATH)) return res.end();
+
+  const key = JSON.parse(fs.readFileSync(KEY_PATH));
+  if (!validateKey(key)) return res.end();
+
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
   });
 
-  res.write('data: [SYSTEM] Consola conectada\n\n');
   clients.push(res);
-
-  req.on('close', () => {
+  req.on("close", () => {
     clients = clients.filter(c => c !== res);
   });
 });
 
-// Apagar servidor
-app.post('/admin/shutdown', auth, () => {
-  log('Servidor apagándose...');
-  setTimeout(() => process.exit(0), 1000);
+/* ===============================
+   APAGAR SERVIDOR
+================================ */
+
+app.post("/admin/shutdown", basicAuth, (req, res) => {
+  if (!fs.existsSync(KEY_PATH)) return res.end();
+
+  const key = JSON.parse(fs.readFileSync(KEY_PATH));
+  if (!validateKey(key)) return res.end();
+
+  log("Servidor apagado por admin");
+  res.end("OK");
+  process.exit(0);
 });
 
-// =====================
-// INICIO SERVIDOR
-// =====================
-app.listen(PORT, () => {
-  log('Neogrow Server iniciado');
-  log('Generando estructura de carpetas');
-  log('Cargando panel privado');
+/* ===============================
+   START
+================================ */
 
-  downloadAndExtract(LASTED_ZIP, PUBLIC_DIR, 'lasted.zip');
-  downloadAndExtract(PRIV_ZIP, PRIVATE_DIR, 'priv.zip');
+app.listen(PORT, () => {
+  log(`Servidor escuchando en puerto ${PORT}`);
 });
