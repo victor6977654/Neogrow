@@ -1,5 +1,5 @@
 {
-  "name": "neogrow-server",
+  "name": "neogrow-lasted-server",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
