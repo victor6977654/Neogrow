@@ -1,86 +1,54 @@
 const fs = require("fs");
 const path = require("path");
-const https = require("https");
 const express = require("express");
 const unzipper = require("unzipper");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+// Rutas
 const ROOT = __dirname;
-const PUBLIC_DIR = path.join(ROOT, "public_html");
-const LASTED_DIR = path.join(PUBLIC_DIR, "lasted");
+const PUBLIC = path.join(ROOT, "public_html");
+const ZIP_FILE = path.join(PUBLIC, "zip", "lasted.zip");
+const DOWNLOAD_DIR = path.join(PUBLIC, "download");
+const OFFLINE_FILE = path.join(DOWNLOAD_DIR, "eagle-offline.html");
 
-const LASTED_ZIP_URL =
-  "https://anarquist.ps.fhgdps.com/download/lasted.zip";
-
-/* ===============================
-   UTILIDADES
-================================ */
-
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+// --- DESCOMPRIMIR SOLO SI NO EXISTE ---
+async function unzipIfNeeded() {
+  if (fs.existsSync(OFFLINE_FILE)) {
+    console.log("✔ eagle-offline.html ya existe, no se descomprime");
+    return;
   }
-}
 
-function downloadZip(url, dest) {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    https.get(url, res => {
-      if (res.statusCode !== 200) {
-        reject(new Error("Error HTTP " + res.statusCode));
-        return;
-      }
-      res.pipe(file);
-      file.on("finish", () => file.close(resolve));
-    }).on("error", reject);
-  });
-}
+  if (!fs.existsSync(ZIP_FILE)) {
+    console.error("❌ No existe public_html/zip/lasted.zip");
+    return;
+  }
 
-function unzip(zipPath, dest) {
-  return fs
-    .createReadStream(zipPath)
-    .pipe(unzipper.Extract({ path: dest }))
+  console.log("📦 Descomprimiendo lasted.zip...");
+
+  fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+
+  await fs.createReadStream(ZIP_FILE)
+    .pipe(unzipper.Extract({ path: PUBLIC }))
     .promise();
+
+  console.log("✅ eagle-offline.html extraído correctamente");
 }
 
-/* ===============================
-   INICIALIZACIÓN
-================================ */
-
+// --- ARRANQUE ---
 (async () => {
-  try {
-    ensureDir(PUBLIC_DIR);
+  await unzipIfNeeded();
 
-    if (!fs.existsSync(LASTED_DIR)) {
-      console.log("Descargando lasted.zip...");
-      await downloadZip(LASTED_ZIP_URL, "lasted.zip");
+  // Servir todo public_html
+  app.use(express.static(PUBLIC));
 
-      console.log("Descomprimiendo lasted.zip...");
-      await unzip("lasted.zip", PUBLIC_DIR);
+  // Página principal
+  app.get("/", (req, res) => {
+    res.sendFile(path.join(PUBLIC, "index.html"));
+  });
 
-      fs.unlinkSync("lasted.zip");
-      console.log("lasted.zip listo");
-    } else {
-      console.log("lasted ya existe, no se descarga");
-    }
-  } catch (err) {
-    console.error("ERROR INIT:", err.message);
-    // NO se cae el servidor
-  }
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Servidor activo en 0.0.0.0:${PORT}`);
+  });
 })();
-
-/* ===============================
-   SERVIDOR WEB
-================================ */
-
-app.use(express.static(PUBLIC_DIR));
-
-app.get("/", (req, res) => {
-  res.redirect("/lasted/index.html");
-});
-
-app.listen(PORT, () => {
-  console.log("Servidor activo en puerto", PORT);
-});
