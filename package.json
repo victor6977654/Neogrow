@@ -1,7 +1,6 @@
 {
   "name": "neogrow-server",
   "version": "1.0.0",
-  "description": "Neogrow Eaglecraft Node Server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
