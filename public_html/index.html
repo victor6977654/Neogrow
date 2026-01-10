@@ -3,96 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <title>Neogrow Launcher</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{
-  margin:0;
-  height:100vh;
-  background:linear-gradient(135deg,#005eff,#00ffb0);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  font-family:Arial,sans-serif;
-  color:white;
-}
-.panel{
-  background:rgba(255,255,255,0.15);
-  padding:40px;
-  border-radius:20px;
-  backdrop-filter:blur(10px);
-  text-align:center;
-}
-h1{margin-bottom:30px;}
-button{
-  display:block;
-  margin:15px auto;
-  padding:15px 35px;
-  border:none;
-  border-radius:30px;
-  font-size:16px;
-  cursor:pointer;
-  color:white;
-  background:linear-gradient(135deg,#00c6ff,#00ff99);
-  transition:.3s;
-}
-button:hover{
-  transform:scale(1.08);
-  box-shadow:0 0 20px rgba(0,0,0,.4);
-}
-footer{
-  position:absolute;
-  bottom:20px;
-  font-size:12px;
-  opacity:.85;
-  cursor:pointer;
-}
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a3cff, #00c98b);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+
+  .panel {
+    font-size: 2.5em;
+    font-weight: bold;
+    margin-bottom: 30px;
+    letter-spacing: 2px;
+  }
+
+  .container {
+    background: rgba(0,0,0,0.25);
+    padding: 30px;
+    border-radius: 18px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.4);
+    width: 90%;
+    max-width: 420px;
+    text-align: center;
+  }
+
+  button {
+    width: 100%;
+    padding: 15px;
+    margin: 12px 0;
+    border: none;
+    border-radius: 14px;
+    font-size: 1.05em;
+    font-weight: bold;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, #00e5ff, #00ff9d);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+  }
+
+  button:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.45);
+  }
+
+  button:active {
+    transform: scale(0.97);
+  }
+
+  footer {
+    margin-top: 30px;
+    font-size: 0.85em;
+    opacity: 0.8;
+    cursor: pointer;
+  }
+
+  footer:hover {
+    opacity: 1;
+    text-decoration: underline;
+  }
 </style>
 </head>
 
 <body>
 
-<div class="panel">
-  <h1>Neogrow</h1>
+  <div class="panel">Neogrow</div>
 
-  <button onclick="location.href='eagle-lasted.html'">
-    Iniciar Eaglecraft (Server node)
-  </button>
+  <div class="container">
+    <button onclick="location.href='/eagle-lasted.html'">
+      Iniciar Eaglecraft (Server node)
+    </button>
 
-  <button onclick="location.href='https://eaglercraft.com'">
-    Iniciar Eaglecraft (Official Webpage)
-  </button>
+    <button onclick="location.href='https://eaglercraft.com'">
+      Iniciar Eaglecraft (Official Webpage)
+    </button>
 
-  <button onclick="cacheOffline()">
-    Eaglecraft Offline (Cache, LocalStorage)
-  </button>
-</div>
+    <button onclick="location.href='/download/eagle-offline.html'">
+      Eagleforge mods for Eaglecraft
+    </button>
+  </div>
 
-<footer onclick="info()">No Copyright © Neogrow</footer>
+  <footer onclick="showInfo()">
+    No Copyright © Neogrow
+  </footer>
 
 <script>
-async function cacheOffline(){
-  if(!('caches' in window)){
-    alert('Cache no soportado');
-    return;
+  function showInfo() {
+    alert(
+      "Neogrow funciona como launcher.\n\n" +
+      "Este proyecto usa versiones que no son propias y no reclama derechos de autor.\n" +
+      "El sitio oficial del proyecto original es:\n" +
+      "https://eaglercraft.com"
+    );
   }
-
-  const cache = await caches.open('neogrow-offline');
-  await cache.add('/download/eagle-offline.html');
-
-  alert(
-    'Eaglecraft Offline guardado.\n' +
-    'Configuraciones usarán LocalStorage.'
-  );
-}
-
-function info(){
-  alert(
-    'Neogrow es un launcher.\n' +
-    'No utiliza contenido propio.\n' +
-    'Sitio oficial:\nhttps://eaglercraft.com'
-  );
-}
 </script>
 
 </body>
