@@ -1,14 +1,16 @@
 {
-  "name": "maintenance-server",
+  "name": "neogrow-server",
   "version": "1.0.0",
-  "description": "Servidor en modo mantenimiento",
+  "description": "Servidor Node con panel admin y consola en tiempo real",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "author": "Victor Andres",
+  "author": "Neogrow",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "basic-auth": "^2.0.1",
+    "unzipper": "^0.10.11"
   }
 }
