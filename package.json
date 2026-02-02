@@ -1,7 +1,7 @@
 {
-  "name": "node-php-temporal-server",
+  "name": "node-proxy-neogrow",
   "version": "1.0.0",
-  "description": "Servidor Node.js que sirve archivos estáticos y ejecuta PHP temporal en hosting remoto vía FTP",
+  "description": "Servidor Node.js proxy que sirve archivos de neogrow.unaux.com/almacen/node",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,9 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.6",
-    "basic-ftp": "^5.0.0",
-    "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1"
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
