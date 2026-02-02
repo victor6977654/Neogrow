@@ -1,15 +1,21 @@
 {
-  "name": "render-server",
+  "name": "node-php-temporal-server",
   "version": "1.0.0",
-  "description": "Servidor HTTP + WebDAV para htdocs, listo para Render",
+  "description": "Servidor Node.js que sirve archivos estáticos y ejecuta PHP temporal en hosting remoto vía FTP",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "author": "Victor Andres",
+  "author": "TuNombre",
   "license": "MIT",
   "dependencies": {
+    "axios": "^1.6.6",
+    "basic-ftp": "^5.0.0",
     "express": "^4.18.2",
-    "webdav-server": "^2.3.0"
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
   }
 }
