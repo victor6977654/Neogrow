@@ -1,0 +1,15 @@
+{
+  "name": "render-server",
+  "version": "1.0.0",
+  "description": "Servidor HTTP + WebDAV para htdocs, listo para Render",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "Victor Andres",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "webdav-server": "^2.3.0"
+  }
+}
