@@ -5,6 +5,9 @@ function setupWebDAV(app, htdocsDir) {
         rootFileSystem: new webdav.PhysicalFileSystem(htdocsDir)
     });
 
+    // Crear un usuario y contraseña
+    webdavServer.userManager.addUser('admin', '1234', false); // usuario: admin, pass: 1234
+
     // Middleware que detecta métodos WebDAV
     app.use((req, res, next) => {
         const webdavMethods = [
@@ -13,7 +16,10 @@ function setupWebDAV(app, htdocsDir) {
         ];
 
         if (webdavMethods.includes(req.method)) {
-            webdavServer.handleRequest(req, res);
+            // Autenticación básica
+            webdavServer.httpAuthentication(req, res, () => {
+                webdavServer.handleRequest(req, res);
+            });
         } else {
             next();
         }
