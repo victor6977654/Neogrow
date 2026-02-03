@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Impostor Secreto</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+  body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #6a11cb, #2575fc, #ff6ec7);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin-top: 40px; font-size: 2.5em; text-shadow: 2px 2px 5px rgba(0,0,0,0.3);}
+  #setup, #game { 
+    background: rgba(0,0,0,0.3); 
+    padding: 30px; 
+    border-radius: 15px; 
+    margin-top: 30px; 
+    box-shadow: 0 0 20px rgba(0,0,0,0.4); 
+    min-width: 300px; 
+    max-width: 600px;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  button {
+    background: linear-gradient(90deg, #ff6ec7, #6a11cb);
+    border: none;
+    padding: 12px 25px;
+    margin: 10px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #fff;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  }
+
+  button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+  }
+
+  #players, #votesDiv, #timer { margin: 20px 0; font-size: 1.1em; }
+  
+  #about {
+    margin-top: 40px;
+    max-width: 700px;
+    text-align: left;
+    background: rgba(255,255,255,0.1);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    font-size: 14px;
+    line-height: 1.5em;
+  }
+
+  .flash-red { animation: flashRed 0.2s; }
+  @keyframes flashRed {
+    0% { background-color: #ff0000; }
+    50% { background-color: transparent; }
+    100% { background-color: #ff0000; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Impostor Secreto</h1>
+
+<div id="setup">
+  <button onclick="startLocalGame()">Iniciar Juego Local</button>
+</div>
+
+<div id="game" style="display:none;">
+  <h2 id="roleDisplay"></h2>
+  <div id="timer">Ronda: 3:00</div>
+  <button onclick="revealWord()">Revelar palabra</button>
+  <div id="players"></div>
+  <div id="votesDiv"></div>
+  <button onclick="voteSelf()">Votarme a mí mismo (Easter Egg)</button>
+  <button onclick="nextPlayer()">Siguiente jugador</button>
+</div>
+
+<div id="about">
+  <h3>Acerca del juego</h3>
+  <p>
+    Este es un modo de desarrollo <strong>local</strong> del juego <strong>Impostor Secreto</strong>. 
+    Los jugadores hablan entre ellos, se pasa el dispositivo y votan al impostor.  
+    Rondas de votación dependen del número de impostores: 1→2 rondas, 2→3 rondas, 3→4 rondas.
+  </p>
+  <p>
+    En el futuro multiplayer: hasta 30 jugadores, chat, votaciones instantáneas, más roles y servidores privados.  
+    Fecha estimada: <strong>17 de febrero de 2026</strong>.
+  </p>
+</div>
+
+<script>
+let players = [];
+let roles = [];
+let playerWords = [];
+let spies = [];
+let currentPlayer = 0;
+let secretWord = "";
+let totalRounds = 0;
+let currentRound = 1;
+let timerInterval;
+
+// Generar más de 10000 palabras simuladas (por ejemplo con combinaciones)
+const words = [];
+for(let i=0;i<10000;i++){
+  words.push("Palabra"+i);
+}
+
+// Roles extra sorpresa
+const extraRoles = ["Detective","Mentor","Fantasma"];
+
+// Temporizador de 3 minutos
+function startTimer(duration){
+  let timer = duration, minutes, seconds;
+  document.getElementById("timer").innerText = "Ronda: 3:00";
+  timerInterval = setInterval(function(){
+    minutes = Math.floor(timer / 60);
+    seconds = timer % 60;
+    document.getElementById("timer").innerText = `Ronda: ${minutes}:${seconds<10?"0"+seconds:seconds}`;
+    if(--timer < 0) clearInterval(timerInterval);
+  },1000);
+}
+
+function startLocalGame(){
+  const numPlayers = parseInt(prompt("Número de jugadores (4-10):", "4")) || 4;
+
+  players = [];
+  roles = [];
+  playerWords = [];
+  spies = [];
+
+  // Asignar roles
+  let impostorsCount = Math.floor(numPlayers/3);
+  totalRounds = impostorsCount + 1;
+  for(let i=0;i<numPlayers;i++){
+    players.push("Jugador "+(i+1));
+    if(i<impostorsCount) roles.push("Impostor");
+    else if(Math.random()<0.2){ roles.push("Espía"); spies.push(i);}
+    else if(Math.random()<0.1){ roles.push(extraRoles[Math.floor(Math.random()*extraRoles.length)])} 
+    else roles.push("Miembro");
+
+    // Palabra asignada
+    if(roles[i]==="Miembro") playerWords.push(words[Math.floor(Math.random()*words.length)]);
+    else playerWords.push("No tienes palabra");
+  }
+
+  currentPlayer=0;
+  currentRound=1;
+  document.getElementById("setup").style.display="none";
+  document.getElementById("game").style.display="block";
+  updateDisplay();
+  startTimer(180);
+}
+
+function updateDisplay(){
+  document.getElementById("roleDisplay").innerText = players[currentPlayer]+" - Rol: "+roles[currentPlayer];
+  document.getElementById("players").innerHTML="Palabra asignada: "+playerWords[currentPlayer];
+  document.getElementById("votesDiv").innerHTML="";
+}
+
+function revealWord(){
+  alert("Palabra: "+playerWords[currentPlayer]);
+}
+
+function voteSelf(){
+  if(Math.random()<0.5){
+    // Parpadeo rojo de impostores
+    roles.forEach((r,i)=>{
+      if(r==="Impostor"){
+        const playerDiv = document.getElementById("players");
+        playerDiv.classList.add("flash-red");
+        setTimeout(()=>playerDiv.classList.remove("flash-red"),200);
+      }
+    });
+  } else {
+    alert("¡Easter Egg activado! Nada sucedió esta vez 😏");
+  }
+}
+
+function nextPlayer(){
+  if(currentPlayer<players.length-1){
+    currentPlayer++;
+    updateDisplay();
+  } else {
+    currentRound++;
+    if(currentRound>totalRounds){
+      alert("Fin de todas las rondas. Revisa resultados y disfruta en familia!");
+      document.getElementById("game").style.display="none";
+      document.getElementById("setup").style.display="block";
+      clearInterval(timerInterval);
+    } else {
+      currentPlayer=0;
+      alert(`Ronda ${currentRound} comienza. Pasen el dispositivo!`);
+      updateDisplay();
+      startTimer(180);
+    }
+  }
+}
+</script>
+
+</body>
+</html>
