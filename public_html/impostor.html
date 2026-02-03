@@ -3,79 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <title>Impostor Secreto</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 
-  body {
-    font-family: 'Roboto', sans-serif;
-    margin: 0;
-    padding: 0;
-    background: linear-gradient(135deg, #6a11cb, #2575fc, #ff6ec7);
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-  }
+body {
+  font-family: 'Roboto', sans-serif;
+  margin:0; padding:0;
+  background: linear-gradient(135deg, #6a11cb, #2575fc, #ff6ec7);
+  color: #fff;
+  display:flex; flex-direction:column; align-items:center;
+  min-height:100vh;
+}
 
-  h1 { margin-top: 40px; font-size: 2.5em; text-shadow: 2px 2px 5px rgba(0,0,0,0.3);}
-  #setup, #game { 
-    background: rgba(0,0,0,0.3); 
-    padding: 30px; 
-    border-radius: 15px; 
-    margin-top: 30px; 
-    box-shadow: 0 0 20px rgba(0,0,0,0.4); 
-    min-width: 300px; 
-    max-width: 600px;
-    text-align: center;
-    transition: all 0.3s ease;
-  }
+h1 { margin-top:40px; font-size:2.5em; text-shadow:2px 2px 5px rgba(0,0,0,0.3);}
+#setup, #game, #multiplayer, #privateServer { 
+  background: rgba(0,0,0,0.3); 
+  padding: 30px; border-radius: 15px; margin-top: 30px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.4); min-width:300px; max-width:600px;
+  text-align:center; transition:all 0.3s ease;
+}
 
-  button {
-    background: linear-gradient(90deg, #ff6ec7, #6a11cb);
-    border: none;
-    padding: 12px 25px;
-    margin: 10px;
-    font-size: 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    color: #fff;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  }
+button {
+  background: linear-gradient(90deg, #ff6ec7, #6a11cb);
+  border: none; padding: 12px 25px; margin: 10px;
+  font-size: 16px; border-radius: 8px; cursor: pointer;
+  color: #fff; font-weight:bold; transition: all 0.3s ease;
+  box-shadow:0 4px 8px rgba(0,0,0,0.2);
+}
 
-  button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-  }
+button:hover { transform: scale(1.05); box-shadow:0 6px 12px rgba(0,0,0,0.3); }
 
-  #players, #votesDiv, #timer { margin: 20px 0; font-size: 1.1em; }
-  
-  #about {
-    margin-top: 40px;
-    max-width: 700px;
-    text-align: left;
-    background: rgba(255,255,255,0.1);
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
-    font-size: 14px;
-    line-height: 1.5em;
-  }
+#players, #votesDiv, #timer, #chatBox { margin:20px 0; font-size:1.1em; }
 
-  .flash-red { animation: flashRed 0.2s; }
-  @keyframes flashRed {
-    0% { background-color: #ff0000; }
-    50% { background-color: transparent; }
-    100% { background-color: #ff0000; }
-  }
+#about {
+  margin-top:40px; max-width:700px; text-align:left;
+  background: rgba(255,255,255,0.1); padding:20px; border-radius:12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3); font-size:14px; line-height:1.5em;
+}
+
+.flash-red { animation: flashRed 0.2s; }
+@keyframes flashRed {
+  0%{background-color:#ff0000;} 50%{background-color:transparent;} 100%{background-color:#ff0000;}
+}
+
+#modsList { margin-top: 15px; }
 </style>
 </head>
 <body>
 
 <h1>Impostor Secreto</h1>
 
+<!-- -------------------- -->
+<!-- Modo Local -->
+<!-- -------------------- -->
 <div id="setup">
   <button onclick="startLocalGame()">Iniciar Juego Local</button>
 </div>
@@ -90,76 +71,76 @@
   <button onclick="nextPlayer()">Siguiente jugador</button>
 </div>
 
+<!-- -------------------- -->
+<!-- Multiplayer Público -->
+<!-- -------------------- -->
+<div id="multiplayer">
+  <h2>Conexión Multiplayer Público</h2>
+  <input type="text" id="username" placeholder="Tu nombre">
+  <input type="text" id="room" placeholder="Sala (ej. Familia)">
+  <button onclick="connectPublic()">Conectarse</button>
+  <div id="chatBox"></div>
+  <input type="text" id="chatInput" placeholder="Escribe tu mensaje">
+  <button onclick="sendMessage()">Enviar</button>
+</div>
+
+<!-- -------------------- -->
+<!-- Servidores Privados -->
+<!-- -------------------- -->
+<div id="privateServer">
+  <h2>Conectar a Servidor Privado</h2>
+  <input type="text" id="privName" placeholder="Nombre del Server">
+  <input type="password" id="privPass" placeholder="Contraseña">
+  <input type="number" id="privPort" placeholder="Puerto (opcional)">
+  <button onclick="connectPrivate()">Conectarse a Privado</button>
+</div>
+
+<!-- -------------------- -->
+<!-- About / Mods -->
+<!-- -------------------- -->
 <div id="about">
   <h3>Acerca del juego</h3>
-  <p>
-    Este es un modo de desarrollo <strong>local</strong> del juego <strong>Impostor Secreto</strong>. 
-    Los jugadores hablan entre ellos, se pasa el dispositivo y votan al impostor.  
-    Rondas de votación dependen del número de impostores: 1→2 rondas, 2→3 rondas, 3→4 rondas.
-  </p>
-  <p>
-    En el futuro multiplayer: hasta 30 jugadores, chat, votaciones instantáneas, más roles y servidores privados.  
-    Fecha estimada: <strong>17 de febrero de 2026</strong>.
-  </p>
+  <p>Modo local familiar, multiplayer público y servidores privados con chat y mods.</p>
+  <div id="modsList">Mods cargados aparecerán aquí</div>
 </div>
 
 <script>
-let players = [];
-let roles = [];
-let playerWords = [];
-let spies = [];
-let currentPlayer = 0;
-let secretWord = "";
-let totalRounds = 0;
-let currentRound = 1;
+// ----------------------------------------
+// Modo Local
+// ----------------------------------------
+let players = [], roles = [], playerWords = [], spies=[], currentPlayer=0, totalRounds=1, currentRound=1;
 let timerInterval;
+const words=[];
+for(let i=0;i<10000;i++) words.push("Palabra"+i);
+const extraRoles=["Detective","Mentor","Fantasma"];
 
-// Generar más de 10000 palabras simuladas (por ejemplo con combinaciones)
-const words = [];
-for(let i=0;i<10000;i++){
-  words.push("Palabra"+i);
-}
-
-// Roles extra sorpresa
-const extraRoles = ["Detective","Mentor","Fantasma"];
-
-// Temporizador de 3 minutos
 function startTimer(duration){
-  let timer = duration, minutes, seconds;
-  document.getElementById("timer").innerText = "Ronda: 3:00";
-  timerInterval = setInterval(function(){
-    minutes = Math.floor(timer / 60);
-    seconds = timer % 60;
-    document.getElementById("timer").innerText = `Ronda: ${minutes}:${seconds<10?"0"+seconds:seconds}`;
-    if(--timer < 0) clearInterval(timerInterval);
+  let timer=duration, minutes, seconds;
+  document.getElementById("timer").innerText="Ronda: 3:00";
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    minutes=Math.floor(timer/60);
+    seconds=timer%60;
+    document.getElementById("timer").innerText=`Ronda: ${minutes}:${seconds<10?"0"+seconds:seconds}`;
+    if(--timer<0) clearInterval(timerInterval);
   },1000);
 }
 
 function startLocalGame(){
-  const numPlayers = parseInt(prompt("Número de jugadores (4-10):", "4")) || 4;
-
-  players = [];
-  roles = [];
-  playerWords = [];
-  spies = [];
-
-  // Asignar roles
-  let impostorsCount = Math.floor(numPlayers/3);
-  totalRounds = impostorsCount + 1;
+  const numPlayers=parseInt(prompt("Número de jugadores (4-10):","4"))||4;
+  players=[]; roles=[]; playerWords=[]; spies=[];
+  let impostorsCount=Math.floor(numPlayers/3);
+  totalRounds=impostorsCount+1;
   for(let i=0;i<numPlayers;i++){
     players.push("Jugador "+(i+1));
     if(i<impostorsCount) roles.push("Impostor");
     else if(Math.random()<0.2){ roles.push("Espía"); spies.push(i);}
-    else if(Math.random()<0.1){ roles.push(extraRoles[Math.floor(Math.random()*extraRoles.length)])} 
+    else if(Math.random()<0.1){ roles.push(extraRoles[Math.floor(Math.random()*extraRoles.length)])}
     else roles.push("Miembro");
-
-    // Palabra asignada
     if(roles[i]==="Miembro") playerWords.push(words[Math.floor(Math.random()*words.length)]);
     else playerWords.push("No tienes palabra");
   }
-
-  currentPlayer=0;
-  currentRound=1;
+  currentPlayer=0; currentRound=1;
   document.getElementById("setup").style.display="none";
   document.getElementById("game").style.display="block";
   updateDisplay();
@@ -167,50 +148,88 @@ function startLocalGame(){
 }
 
 function updateDisplay(){
-  document.getElementById("roleDisplay").innerText = players[currentPlayer]+" - Rol: "+roles[currentPlayer];
+  document.getElementById("roleDisplay").innerText=players[currentPlayer]+" - Rol: "+roles[currentPlayer];
   document.getElementById("players").innerHTML="Palabra asignada: "+playerWords[currentPlayer];
   document.getElementById("votesDiv").innerHTML="";
 }
 
-function revealWord(){
-  alert("Palabra: "+playerWords[currentPlayer]);
-}
+function revealWord(){ alert("Palabra: "+playerWords[currentPlayer]); }
 
 function voteSelf(){
   if(Math.random()<0.5){
-    // Parpadeo rojo de impostores
     roles.forEach((r,i)=>{
       if(r==="Impostor"){
-        const playerDiv = document.getElementById("players");
+        const playerDiv=document.getElementById("players");
         playerDiv.classList.add("flash-red");
         setTimeout(()=>playerDiv.classList.remove("flash-red"),200);
       }
     });
-  } else {
-    alert("¡Easter Egg activado! Nada sucedió esta vez 😏");
-  }
+  }else alert("¡Easter Egg activado! Nada sucedió esta vez 😏");
 }
 
 function nextPlayer(){
-  if(currentPlayer<players.length-1){
-    currentPlayer++;
-    updateDisplay();
-  } else {
+  if(currentPlayer<players.length-1){ currentPlayer++; updateDisplay(); }
+  else{
     currentRound++;
     if(currentRound>totalRounds){
-      alert("Fin de todas las rondas. Revisa resultados y disfruta en familia!");
+      alert("Fin de todas las rondas locales. Disfruten en familia!");
       document.getElementById("game").style.display="none";
       document.getElementById("setup").style.display="block";
       clearInterval(timerInterval);
-    } else {
+    }else{
       currentPlayer=0;
       alert(`Ronda ${currentRound} comienza. Pasen el dispositivo!`);
-      updateDisplay();
-      startTimer(180);
+      updateDisplay(); startTimer(180);
     }
   }
 }
-</script>
 
+// ----------------------------------------
+// Multiplayer público
+// ----------------------------------------
+let socketPublic;
+function connectPublic(){
+  const username=document.getElementById("username").value||"Jugador";
+  const room=document.getElementById("room").value||"Sala1";
+  socketPublic=io(); // Conecta al mismo dominio
+  socketPublic.emit("joinRoom",{username,room});
+  socketPublic.on("chatUpdate",({username,message})=>{
+    const cb=document.getElementById("chatBox");
+    cb.innerHTML+=`<b>${username}:</b> ${message}<br>`;
+  });
+}
+function sendMessage(){
+  const msg=document.getElementById("chatInput").value;
+  if(socketPublic && msg){
+    const username=document.getElementById("username").value||"Jugador";
+    const room=document.getElementById("room").value||"Sala1";
+    socketPublic.emit("chatMessage",{room,message:msg,username});
+    document.getElementById("chatInput").value="";
+  }
+}
+
+// ----------------------------------------
+// Servidores privados
+// ----------------------------------------
+let socketPrivate;
+function connectPrivate(){
+  const name=document.getElementById("privName").value;
+  const pass=document.getElementById("privPass").value;
+  const port=document.getElementById("privPort").value||"";
+  if(!name || !pass){ alert("Debes poner nombre y contraseña"); return; }
+  const url=port?`ws://${name}:${port}`:`ws://${name}`;
+  socketPrivate=io(url);
+  socketPrivate.on("connect",()=>alert("Conectado al servidor privado!"));
+}
+
+// ----------------------------------------
+// Mods (dinámico)
+function loadMod(url){
+  const script=document.createElement("script");
+  script.src=url; script.onload=()=>document.getElementById("modsList").innerHTML+=`Mod cargado: ${url}<br>`;
+  document.body.appendChild(script);
+}
+
+</script>
 </body>
-</html>
+  </html>
