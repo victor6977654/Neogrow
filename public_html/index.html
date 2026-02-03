@@ -1,1 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Panel de Juegos</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f0f2f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 50px;
+  }
+  h1 { color: #333; }
+  .game-button {
+    padding: 15px 30px;
+    margin: 15px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: #4caf50;
+    color: white;
+    transition: 0.3s;
+  }
+  .game-button:hover { background-color: #45a049; }
+  #about {
+    max-width: 600px;
+    margin-top: 50px;
+    text-align: center;
+    color: #555;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
 
+<h1>🎮 Panel de Juegos</h1>
+
+<button class="game-button" onclick="location.href='impostor.html'">Impostor Secreto (Local)</button>
+<button class="game-button" onclick="alert('Juego 2 aún no disponible')">Juego 2</button>
+<button class="game-button" onclick="alert('Juego 3 aún no disponible')">Juego 3</button>
+
+<div id="about">
+  <p>
+    Este panel permite acceder a los juegos disponibles. Por ahora, solo <strong>Impostor Secreto</strong> 
+    está listo para jugar en modo local. Los otros juegos estarán disponibles pronto.
+  </p>
+  <p>
+    Próximamente se incluirá la versión multiplayer de <strong>Impostor Secreto</strong>, con votaciones instantáneas, chat, servidores privados y más roles, incluyendo espías. Fecha estimada de lanzamiento: <strong>17 de febrero de 2026</strong>.
+  </p>
+</div>
+
+</body>
+  </html>
