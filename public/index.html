@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NeoGrow</title>
+
+<style>
+body{background:#0f1117;color:white;font-family:Arial;margin:0}
+.container{padding:20px}
+
+.user{
+    background:#161b22;
+    padding:10px;
+    margin:5px;
+    border-radius:10px;
+    display:flex;
+    justify-content:space-between;
+}
+
+button{cursor:pointer}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Usuarios</h2>
+    <div id="list"></div>
+</div>
+
+<script src="http://localhost:3000/socket.io/socket.io.js"></script>
+<script>
+
+const socket = io("http://localhost:3000");
+
+const me = JSON.parse(localStorage.getItem("user"));
+
+socket.emit("register", me.id);
+
+/* simulación básica: lista fija (luego puedes pedir FTP API) */
+const users = ["77043","12345","99999"];
+
+const list = document.getElementById("list");
+
+users.forEach(u => {
+
+    const div = document.createElement("div");
+    div.className = "user";
+
+    div.innerHTML = `
+        <span>${u}</span>
+        <button onclick="call('${u}')">📞</button>
+    `;
+
+    list.appendChild(div);
+});
+
+function call(to){
+    window.location.href = "call.html?to=" + to;
+}
+
+</script>
+
+</body>
+</html>
