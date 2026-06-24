@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Llamada entrante</title>
+</head>
+
+<body>
+
+<h2>Esperando llamada...</h2>
+
+<div id="callBox" style="display:none">
+    <h3 id="from"></h3>
+    <button onclick="accept()">Aceptar</button>
+    <button onclick="reject()">Rechazar</button>
+</div>
+
+<script src="http://localhost:3000/socket.io/socket.io.js"></script>
+
+<script>
+
+const socket = io("http://localhost:3000");
+
+const me = JSON.parse(localStorage.getItem("user"));
+
+socket.emit("register", me.id);
+
+let currentToken = null;
+let caller = null;
+
+socket.on("incoming-call", (data) => {
+
+    currentToken = data.token;
+    caller = data.from;
+
+    document.getElementById("from").innerText = "Llamada de: " + caller;
+    document.getElementById("callBox").style.display = "block";
+});
+
+function accept(){
+    socket.emit("accept-call", { token: currentToken });
+}
+
+function reject(){
+    socket.emit("reject-call", { token: currentToken });
+}
+
+</script>
+
+</body>
+</html>
