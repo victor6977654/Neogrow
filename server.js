@@ -20,9 +20,9 @@ app.use(cookieParser());
    CONFIG FTP
 ========================= */
 const FTP_CONFIG = {
-    host: "TU_HOST",
-    user: "TU_USER",
-    password: "TU_PASS",
+    host: "ftpupload.net",
+    user: "b24_40085255",
+    password: "victorgamer34",
     secure: false
 };
 
