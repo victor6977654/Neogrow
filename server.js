@@ -222,6 +222,6 @@ server.listen(PORT, async () => {
 
     await syncFTP();
 
-    // sync cada 60s (por si FTP cambia)
+    // sync cada 60s (por si FTP. cambia)
     setInterval(syncFTP, 60000);
 });
