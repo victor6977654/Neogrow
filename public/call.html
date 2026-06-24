@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Llamar</title>
+</head>
+
+<body>
+
+<h2>Llamando...</h2>
+
+<script src="http://localhost:3000/socket.io/socket.io.js"></script>
+
+<script>
+
+const socket = io("http://localhost:3000");
+
+const me = JSON.parse(localStorage.getItem("user"));
+const to = new URLSearchParams(location.search).get("to");
+
+socket.emit("register", me.id);
+
+socket.emit("call-user", { to });
+
+socket.on("call-accepted", (data) => {
+    alert("Llamada aceptada");
+});
+
+socket.on("call-rejected", () => {
+    alert("Llamada rechazada");
+});
+
+</script>
+
+</body>
+</html>
