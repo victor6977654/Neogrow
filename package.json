@@ -1,15 +1,15 @@
 {
-  "name": "neogrow",
+  "name": "under-construction-server",
   "version": "1.0.0",
+  "description": "Simple Node.js server showing Under Construction page",
   "main": "server.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5",
-    "cookie-parser": "^1.4.6",
-    "basic-ftp": "^5.0.5"
+  "keywords": ["node", "server", "under-construction"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
   }
 }
