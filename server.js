@@ -1,10 +1,10 @@
 const express = require("express");
 const http = require("http");
+const path = require("path");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
 const ftp = require("basic-ftp");
 const fs = require("fs");
-const path = require("path");
 const crypto = require("crypto");
 
 const app = express();
@@ -13,27 +13,33 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
+/* =========================
+   MIDDLEWARES
+========================= */
 app.use(express.json());
 app.use(cookieParser());
 
 /* =========================
-   CONFIG FTP
+   FRONTEND /public
 ========================= */
-const FTP_CONFIG = {
-    host: "ftpupload.net",
-    user: "b24_40085255",
-    password: "victorgamer34",
-    secure: false
-};
+app.use(express.static(path.join(__dirname, "public")));
 
-const LOCAL_USERS = path.join(__dirname, "users");
-const LOCAL_PFP = path.join(__dirname, "pfp");
+/* FIX: ROOT PAGE */
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+/* =========================
+   FTP LOCAL STORAGE
+========================= */
+const USERS_DIR = path.join(__dirname, "users");
+const PFP_DIR = path.join(__dirname, "pfp");
 
 /* =========================
    MEMORIA TEMPORAL
 ========================= */
 const onlineUsers = {};   // id -> socket.id
-const activeCalls = {};   // token -> call data
+const calls = {};         // token -> call data
 const sessions = {};      // cookie sessions
 
 /* =========================
@@ -44,34 +50,40 @@ async function syncFTP() {
     client.ftp.verbose = false;
 
     try {
-        await client.access(FTP_CONFIG);
+        await client.access({
+            host: "ftpupload.net",
+            user: "b24_40085255",
+            password: "victorgamer34",
+            secure: false
+        });
 
-        await fs.promises.mkdir(LOCAL_USERS, { recursive: true });
-        await fs.promises.mkdir(LOCAL_PFP, { recursive: true });
+        await fs.promises.mkdir(USERS_DIR, { recursive: true });
+        await fs.promises.mkdir(PFP_DIR, { recursive: true });
 
-        await client.downloadToDir(LOCAL_USERS, "htdocs/users");
-        await client.downloadToDir(LOCAL_PFP, "htdocs/pfp");
+        await client.downloadToDir(USERS_DIR, "htdocs/users");
+        await client.downloadToDir(PFP_DIR, "htdocs/pfp");
 
-        console.log("FTP sincronizado");
+        console.log("✔ FTP sincronizado");
     } catch (err) {
-        console.log("Error FTP:", err.message);
+        console.log("✖ FTP error:", err.message);
     }
 
     client.close();
 }
 
 /* =========================
-   USER HELPERS
+   BUSCAR USER POR ID
 ========================= */
 function getUserById(id) {
-    if (!fs.existsSync(LOCAL_USERS)) return null;
 
-    const files = fs.readdirSync(LOCAL_USERS);
+    if (!fs.existsSync(USERS_DIR)) return null;
 
-    for (const f of files) {
+    const files = fs.readdirSync(USERS_DIR);
+
+    for (const file of files) {
         try {
             const user = JSON.parse(
-                fs.readFileSync(path.join(LOCAL_USERS, f))
+                fs.readFileSync(path.join(USERS_DIR, file))
             );
 
             if (String(user.id) === String(id)) {
@@ -106,7 +118,7 @@ app.post("/login", (req, res) => {
         id: user.id,
         user: user.user,
         pfp: user.pfp,
-        created: Date.now()
+        admin: user.admin || 0
     };
 
     res.cookie("neo_session", sessionId, {
@@ -120,7 +132,7 @@ app.post("/login", (req, res) => {
 });
 
 /* =========================
-   SOCKET.IO
+   SOCKET.IO CORE
 ========================= */
 io.on("connection", (socket) => {
 
@@ -131,36 +143,35 @@ io.on("connection", (socket) => {
     });
 
     /* =========================
-       INICIAR LLAMADA
+       LLAMAR USUARIO
     ========================== */
     socket.on("call-user", ({ to }) => {
 
         const from = socket.userId;
         const token = crypto.randomBytes(8).toString("hex");
 
-        activeCalls[token] = { from, to };
+        calls[token] = { from, to };
 
-        const target = onlineUsers[to];
+        const targetSocket = onlineUsers[to];
 
-        if (!target) return;
+        if (!targetSocket) return;
 
         const caller = getUserById(from);
 
-        io.to(target).emit("incoming-call", {
+        io.to(targetSocket).emit("incoming-call", {
             from,
             token,
-            pfp: caller?.pfp || null,
-            user: caller?.user || from
+            user: caller?.user || from,
+            pfp: caller?.pfp || `/pfp/${from}.jpg`
         });
     });
 
     /* =========================
        ACEPTAR LLAMADA
-       (WEBRTC SIGNALING)
     ========================== */
     socket.on("accept-call", ({ token, answer }) => {
 
-        const call = activeCalls[token];
+        const call = calls[token];
         if (!call) return;
 
         const callerSocket = onlineUsers[call.from];
@@ -174,8 +185,23 @@ io.on("connection", (socket) => {
     });
 
     /* =========================
-       ICE CANDIDATES
+       RECHAZAR LLAMADA
     ========================== */
+    socket.on("reject-call", ({ token }) => {
+
+        const call = calls[token];
+        if (!call) return;
+
+        const callerSocket = onlineUsers[call.from];
+
+        if (callerSocket) {
+            io.to(callerSocket).emit("call-rejected");
+        }
+
+        delete calls[token];
+    });
+
+    /* ICE (WEBRTC READY) */
     socket.on("ice-candidate", ({ to, candidate }) => {
 
         const target = onlineUsers[to];
@@ -187,23 +213,7 @@ io.on("connection", (socket) => {
         }
     });
 
-    /* =========================
-       RECHAZAR
-    ========================== */
-    socket.on("reject-call", ({ token }) => {
-
-        const call = activeCalls[token];
-        if (!call) return;
-
-        const callerSocket = onlineUsers[call.from];
-
-        if (callerSocket) {
-            io.to(callerSocket).emit("call-rejected");
-        }
-
-        delete activeCalls[token];
-    });
-
+    /* desconexión */
     socket.on("disconnect", () => {
         if (socket.userId) {
             delete onlineUsers[socket.userId];
@@ -212,16 +222,14 @@ io.on("connection", (socket) => {
 });
 
 /* =========================
-   START + FTP LOOP
+   START SERVER
 ========================= */
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, async () => {
-
-    console.log("NeoGrow activo en puerto " + PORT);
+    console.log("🚀 NeoGrow ON PORT " + PORT);
 
     await syncFTP();
 
-    // sync cada 60s (por si FTP. cambia)
     setInterval(syncFTP, 60000);
 });
