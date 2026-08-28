@@ -1,15 +1,12 @@
 {
-  "name": "under-construction-server",
+  "name": "udp-wss-relay",
   "version": "1.0.0",
-  "description": "Simple Node.js server showing Under Construction page",
-  "main": "server.js",
+  "main": "render-relay.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node render-relay.js"
   },
-  "keywords": ["node", "server", "under-construction"],
-  "author": "",
-  "license": "MIT",
-  "engines": {
-    "node": ">=14"
+  "dependencies": {
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
   }
 }
