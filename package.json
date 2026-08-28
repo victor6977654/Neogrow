@@ -1,9 +1,11 @@
 {
-  "name": "udp-wss-relay",
+  "name": "neogrow-render",
   "version": "1.0.0",
-  "main": "render-relay.js",
+  "description": "NeoGrow Render Gateway",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "node render-relay.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^5.1.0",
