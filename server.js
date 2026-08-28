@@ -15,32 +15,47 @@ const wss = new WebSocketServer({
     path: "/tunnel"
 });
 
-// tunnel_id -> conexiones
 const tunnels = new Map();
 
 wss.on("connection", (ws, req) => {
+    console.log("================================");
+    console.log("[WSS] NUEVA CONEXION");
+
     const url = new URL(req.url, `http://${req.headers.host}`);
     const tunnelId = url.searchParams.get("id");
 
+    console.log("[WSS] Tunnel ID:", tunnelId);
+    console.log("[WSS] IP:", req.socket.remoteAddress);
+
     if (!tunnelId) {
+        console.log("[WSS] ERROR: falta ID");
         ws.close(1008, "Missing tunnel ID");
         return;
     }
-
-    console.log(`[+] Conexión: ${tunnelId}`);
 
     if (!tunnels.has(tunnelId)) {
         tunnels.set(tunnelId, new Set());
     }
 
     const clients = tunnels.get(tunnelId);
+
     clients.add(ws);
 
-    ws.on("message", (data, isBinary) => {
-        // Reenviar el paquete al otro extremo
+    console.log(
+        `[WSS] ${tunnelId} ahora tiene ${clients.size} conexiones`
+    );
+
+    ws.on("message", (data) => {
+        console.log(
+            `[WSS] ${tunnelId}: ${data.length} bytes`
+        );
+
         for (const client of clients) {
-            if (client !== ws && client.readyState === 1) {
-                client.send(data, { binary: isBinary });
+            if (
+                client !== ws &&
+                client.readyState === 1
+            ) {
+                client.send(data);
             }
         }
     });
@@ -48,7 +63,9 @@ wss.on("connection", (ws, req) => {
     ws.on("close", () => {
         clients.delete(ws);
 
-        console.log(`[-] Desconectado: ${tunnelId}`);
+        console.log(
+            `[WSS] Desconectado ${tunnelId}. Restantes: ${clients.size}`
+        );
 
         if (clients.size === 0) {
             tunnels.delete(tunnelId);
@@ -56,12 +73,13 @@ wss.on("connection", (ws, req) => {
     });
 
     ws.on("error", err => {
-        console.error(`[WS ERROR] ${err.message}`);
+        console.log("[WSS] ERROR:", err.message);
     });
 });
 
 const PORT = process.env.PORT || 10000;
 
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Relay escuchando en puerto ${PORT}`);
+    console.log(`[HTTP] Relay escuchando en ${PORT}`);
+    console.log("[HTTP] UDP ↔ WSS Tunnel Relay funcionando");
 });
