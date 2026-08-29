@@ -1,14 +1,15 @@
 {
-  "name": "neogrow-render",
+  "name": "neogrow-tunnel",
   "version": "1.0.0",
-  "description": "NeoGrow Render Gateway",
-  "type": "module",
+  "description": "Reverse WSS tunnel para exponer un servidor HTTP local",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^5.1.0",
     "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
