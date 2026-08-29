@@ -15,11 +15,12 @@ const server = http.createServer((req, res) => {
             "Cache-Control": "no-store"
         });
 
-        return res.end("Web no disponible, inténtalo más tarde.\n");
+        return res.end(
+            "Web no disponible, inténtalo más tarde.\n"
+        );
     }
 
     const id = crypto.randomUUID();
-
     const chunks = [];
 
     req.on("data", chunk => {
@@ -38,13 +39,14 @@ const server = http.createServer((req, res) => {
             url: req.url,
             headers: req.headers,
             body: body.toString("base64")
-        }), error => {
-            if (error) {
+        }), err => {
+            if (err) {
                 pending.delete(id);
 
                 if (!res.headersSent) {
                     res.writeHead(502, {
-                        "Content-Type": "text/plain; charset=utf-8"
+                        "Content-Type":
+                            "text/plain; charset=utf-8"
                     });
                 }
 
@@ -56,19 +58,6 @@ const server = http.createServer((req, res) => {
     req.on("error", () => {
         pending.delete(id);
     });
-
-    // Evita conexiones HTTP colgadas indefinidamente
-    req.setTimeout(30000, () => {
-        pending.delete(id);
-
-        if (!res.headersSent) {
-            res.writeHead(504, {
-                "Content-Type": "text/plain; charset=utf-8"
-            });
-        }
-
-        res.end("Tiempo de espera agotado.\n");
-    });
 });
 
 
@@ -79,37 +68,70 @@ const wss = new WebSocket.Server({
 
 
 wss.on("connection", (ws, req) => {
+
+    console.log("================================");
+    console.log("Nueva conexión WSS");
+    console.log("IP:", req.socket.remoteAddress);
+    console.log("Token recibido:",
+        req.headers["x-tunnel-token"]
+            ? "SI"
+            : "NO"
+    );
+    console.log("Token configurado:",
+        TUNNEL_TOKEN
+            ? "SI"
+            : "NO"
+    );
+    console.log("================================");
+
+
     const token = req.headers["x-tunnel-token"];
 
-    if (!TUNNEL_TOKEN || token !== TUNNEL_TOKEN) {
-        console.log("Intento de conexión no autorizado");
+    if (!TUNNEL_TOKEN) {
+        console.log("ERROR: TUNNEL_TOKEN no configurado");
+        ws.close(1011, "Server token missing");
+        return;
+    }
+
+
+    if (token !== TUNNEL_TOKEN) {
+        console.log("ERROR: token incorrecto");
 
         ws.close(1008, "Unauthorized");
         return;
     }
 
-    // Solo permitimos un PC conectado a la vez
+
+    console.log("TOKEN CORRECTO");
+
+
     if (tunnel && tunnel.readyState === WebSocket.OPEN) {
-        tunnel.close(1000, "Replaced by new tunnel");
+        console.log("Cerrando túnel anterior");
+        tunnel.close(1000, "New tunnel");
     }
+
 
     tunnel = ws;
 
-    console.log("PC conectado al túnel");
+    console.log("PC CONECTADO AL TUNEL");
 
 
     ws.on("message", data => {
+
         let message;
 
         try {
             message = JSON.parse(data.toString());
         } catch {
+            console.log("Mensaje JSON inválido");
             return;
         }
+
 
         if (message.type !== "response") {
             return;
         }
+
 
         const res = pending.get(message.id);
 
@@ -117,55 +139,81 @@ wss.on("connection", (ws, req) => {
             return;
         }
 
+
         pending.delete(message.id);
 
-        const headers = message.headers || {};
 
-        // Evitar headers problemáticos enviados por el proxy
+        const headers = {
+            ...(message.headers || {})
+        };
+
+
         delete headers.connection;
         delete headers["transfer-encoding"];
+
 
         res.writeHead(
             message.statusCode || 502,
             headers
         );
 
+
         const body = Buffer.from(
             message.body || "",
             "base64"
         );
 
+
         res.end(body);
     });
 
 
-    ws.on("close", () => {
+    ws.on("close", (code, reason) => {
+
+        console.log(
+            "PC DESCONECTADO",
+            "code:",
+            code,
+            "reason:",
+            reason.toString()
+        );
+
+
         if (tunnel === ws) {
             tunnel = null;
-            console.log("PC desconectado");
 
-            // Liberar peticiones pendientes
+
             for (const [id, res] of pending) {
+
                 if (!res.headersSent) {
                     res.writeHead(503, {
-                        "Content-Type": "text/plain; charset=utf-8"
+                        "Content-Type":
+                            "text/plain; charset=utf-8"
                     });
                 }
 
-                res.end("Web no disponible, inténtalo más tarde.\n");
+                res.end(
+                    "Web no disponible, inténtalo más tarde.\n"
+                );
             }
+
 
             pending.clear();
         }
     });
 
 
-    ws.on("error", error => {
-        console.log("Error WSS:", error.message);
+    ws.on("error", err => {
+        console.log(
+            "ERROR WSS:",
+            err.message
+        );
     });
 });
 
 
 server.listen(PORT, () => {
-    console.log(`Render tunnel escuchando en puerto ${PORT}`);
+    console.log(
+        `Servidor escuchando en puerto ${PORT}`
+    );
 });
