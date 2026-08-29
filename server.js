@@ -143,29 +143,44 @@ wss.on("connection", (ws, req) => {
         pending.delete(message.id);
 
 
-        const headers = {
-            ...(message.headers || {})
-        };
+const headers = {
+    ...(message.headers || {})
+};
 
+delete headers.connection;
+delete headers["transfer-encoding"];
 
-        delete headers.connection;
-        delete headers["transfer-encoding"];
-
-
-        res.writeHead(
-            message.statusCode || 502,
-            headers
+if (headers.location) {
+    try {
+        const location = new URL(
+            headers.location,
+            "https://neogrow.onrender.com"
         );
 
+        if (
+            location.hostname === "127.0.0.1" ||
+            location.hostname === "localhost"
+        ) {
+            headers.location =
+                "https://neogrow.onrender.com" +
+                location.pathname +
+                location.search +
+                location.hash;
+        }
+    } catch {}
+}
 
-        const body = Buffer.from(
-            message.body || "",
-            "base64"
-        );
+res.writeHead(
+    message.statusCode || 502,
+    headers
+);
 
+const body = Buffer.from(
+    message.body || "",
+    "base64"
+);
 
-        res.end(body);
-    });
+res.end(body);
 
 
     ws.on("close", (code, reason) => {
