@@ -3,13 +3,26 @@ const WebSocket = require("ws");
 const crypto = require("crypto");
 
 const PORT = process.env.PORT || 10000;
+
+// Token fijo
 const TUNNEL_TOKEN = "RDXZ-9f82Kx7LmP4Qz81-TUNNEL";
 
+const PUBLIC_URL = "https://neogrow.onrender.com";
+
 let tunnel = null;
+
 const pending = new Map();
 
+
+// ===============================
+// SERVIDOR HTTP PÚBLICO
+// ===============================
+
 const server = http.createServer((req, res) => {
+
+    // PC desconectado
     if (!tunnel || tunnel.readyState !== WebSocket.OPEN) {
+
         res.writeHead(503, {
             "Content-Type": "text/plain; charset=utf-8",
             "Cache-Control": "no-store"
@@ -20,110 +33,164 @@ const server = http.createServer((req, res) => {
         );
     }
 
+
     const id = crypto.randomUUID();
+
     const chunks = [];
+
 
     req.on("data", chunk => {
         chunks.push(chunk);
     });
 
+
     req.on("end", () => {
+
         const body = Buffer.concat(chunks);
 
         pending.set(id, res);
 
-        tunnel.send(JSON.stringify({
-            type: "request",
-            id,
-            method: req.method,
-            url: req.url,
-            headers: req.headers,
-            body: body.toString("base64")
-        }), err => {
-            if (err) {
-                pending.delete(id);
 
-                if (!res.headersSent) {
-                    res.writeHead(502, {
-                        "Content-Type":
-                            "text/plain; charset=utf-8"
-                    });
+        tunnel.send(
+            JSON.stringify({
+                type: "request",
+                id: id,
+                method: req.method,
+                url: req.url,
+                headers: req.headers,
+                body: body.toString("base64")
+            }),
+            error => {
+
+                if (error) {
+
+                    pending.delete(id);
+
+                    if (!res.headersSent) {
+
+                        res.writeHead(502, {
+                            "Content-Type":
+                                "text/plain; charset=utf-8"
+                        });
+                    }
+
+                    res.end("Error en el túnel.\n");
                 }
-
-                res.end("Error en el túnel.\n");
             }
-        });
+        );
     });
+
 
     req.on("error", () => {
         pending.delete(id);
     });
+
+
+    req.setTimeout(30000, () => {
+
+        pending.delete(id);
+
+        if (!res.headersSent) {
+
+            res.writeHead(504, {
+                "Content-Type":
+                    "text/plain; charset=utf-8"
+            });
+        }
+
+        res.end("Tiempo de espera agotado.\n");
+    });
+
 });
 
 
+// ===============================
+// SERVIDOR WSS
+// ===============================
+
 const wss = new WebSocket.Server({
-    server,
+    server: server,
     path: "/tunnel"
 });
 
 
 wss.on("connection", (ws, req) => {
 
-    console.log("================================");
+    console.log("--------------------------------");
     console.log("Nueva conexión WSS");
-    console.log("IP:", req.socket.remoteAddress);
-    console.log("Token recibido:",
-        req.headers["x-tunnel-token"]
-            ? "SI"
-            : "NO"
-    );
-    console.log("Token configurado:",
-        TUNNEL_TOKEN
-            ? "SI"
-            : "NO"
-    );
-    console.log("================================");
 
 
     const token = req.headers["x-tunnel-token"];
 
-    if (!TUNNEL_TOKEN) {
-        console.log("ERROR: TUNNEL_TOKEN no configurado");
-        ws.close(1011, "Server token missing");
+
+    if (!token) {
+
+        console.log("No se recibió token");
+
+        ws.close(1008, "Token requerido");
+
         return;
     }
 
 
     if (token !== TUNNEL_TOKEN) {
-        console.log("ERROR: token incorrecto");
 
-        ws.close(1008, "Unauthorized");
+        console.log("Token incorrecto");
+
+        ws.close(1008, "Token incorrecto");
+
         return;
     }
 
 
-    console.log("TOKEN CORRECTO");
+    console.log("Token correcto");
 
 
-    if (tunnel && tunnel.readyState === WebSocket.OPEN) {
-        console.log("Cerrando túnel anterior");
-        tunnel.close(1000, "New tunnel");
+    // Si ya había otro PC conectado
+    if (
+        tunnel &&
+        tunnel.readyState === WebSocket.OPEN
+    ) {
+
+        console.log(
+            "Cerrando túnel anterior"
+        );
+
+        tunnel.close(
+            1000,
+            "Nuevo túnel conectado"
+        );
     }
 
 
     tunnel = ws;
 
-    console.log("PC CONECTADO AL TUNEL");
 
+    console.log("PC CONECTADO AL TÚNEL");
+    console.log("--------------------------------");
+
+
+    // ===============================
+    // RESPUESTAS DEL PC
+    // ===============================
 
     ws.on("message", data => {
 
         let message;
 
+
         try {
-            message = JSON.parse(data.toString());
-        } catch {
-            console.log("Mensaje JSON inválido");
+
+            message = JSON.parse(
+                data.toString()
+            );
+
+        } catch (error) {
+
+            console.log(
+                "Mensaje JSON inválido"
+            );
+
             return;
         }
 
@@ -133,7 +200,9 @@ wss.on("connection", (ws, req) => {
         }
 
 
-        const res = pending.get(message.id);
+        const res =
+            pending.get(message.id);
+
 
         if (!res) {
             return;
@@ -143,45 +212,120 @@ wss.on("connection", (ws, req) => {
         pending.delete(message.id);
 
 
-const headers = {
-    ...(message.headers || {})
-};
+        // Copiar headers
+        const headers = {
+            ...(message.headers || {})
+        };
 
-delete headers.connection;
-delete headers["transfer-encoding"];
 
-if (headers.location) {
-    try {
-        const location = new URL(
-            headers.location,
-            "https://neogrow.onrender.com"
+        // Headers que no debemos reenviar
+        delete headers.connection;
+        delete headers["transfer-encoding"];
+
+
+        // ===============================
+        // CORREGIR REDIRECCIONES
+        // ===============================
+
+        if (headers.location) {
+
+            let location =
+                headers.location;
+
+
+            // localhost
+            if (
+                location.indexOf(
+                    "http://127.0.0.1"
+                ) === 0
+            ) {
+
+                location =
+                    location.replace(
+                        "http://127.0.0.1",
+                        PUBLIC_URL
+                    );
+            }
+
+
+            else if (
+                location.indexOf(
+                    "https://127.0.0.1"
+                ) === 0
+            ) {
+
+                location =
+                    location.replace(
+                        "https://127.0.0.1",
+                        PUBLIC_URL
+                    );
+            }
+
+
+            // localhost
+            else if (
+                location.indexOf(
+                    "http://localhost"
+                ) === 0
+            ) {
+
+                location =
+                    location.replace(
+                        "http://localhost",
+                        PUBLIC_URL
+                    );
+            }
+
+
+            else if (
+                location.indexOf(
+                    "https://localhost"
+                ) === 0
+            ) {
+
+                location =
+                    location.replace(
+                        "https://localhost",
+                        PUBLIC_URL
+                    );
+            }
+
+
+            headers.location =
+                location;
+
+
+            console.log(
+                "Location:",
+                headers.location
+            );
+        }
+
+
+        // ===============================
+        // DEVOLVER RESPUESTA
+        // ===============================
+
+        res.writeHead(
+            message.statusCode || 502,
+            headers
         );
 
-        if (
-            location.hostname === "127.0.0.1" ||
-            location.hostname === "localhost"
-        ) {
-            headers.location =
-                "https://neogrow.onrender.com" +
-                location.pathname +
-                location.search +
-                location.hash;
-        }
-    } catch {}
-}
 
-res.writeHead(
-    message.statusCode || 502,
-    headers
-);
+        const body = Buffer.from(
+            message.body || "",
+            "base64"
+        );
 
-const body = Buffer.from(
-    message.body || "",
-    "base64"
-);
 
-res.end(body);
+        res.end(body);
 
+    });
+
+
+    // ===============================
+    // DESCONEXIÓN
+    // ===============================
 
     ws.on("close", (code, reason) => {
 
@@ -195,17 +339,24 @@ res.end(body);
 
 
         if (tunnel === ws) {
+
             tunnel = null;
 
 
-            for (const [id, res] of pending) {
+            // Responder 503 a peticiones pendientes
+            for (
+                const [id, res]
+                of pending
+            ) {
 
                 if (!res.headersSent) {
+
                     res.writeHead(503, {
                         "Content-Type":
                             "text/plain; charset=utf-8"
                     });
                 }
+
 
                 res.end(
                     "Web no disponible, inténtalo más tarde.\n"
@@ -215,20 +366,50 @@ res.end(body);
 
             pending.clear();
         }
+
     });
 
 
-    ws.on("error", err => {
+    // ===============================
+    // ERROR WSS
+    // ===============================
+
+    ws.on("error", error => {
+
         console.log(
             "ERROR WSS:",
-            err.message
+            error.message
         );
+
     });
+
 });
 
 
+// ===============================
+// INICIAR SERVIDOR
+// ===============================
+
 server.listen(PORT, () => {
+
     console.log(
-        `Servidor escuchando en puerto ${PORT}`
+        "================================"
     );
+
+    console.log(
+        "NEOGROW TUNNEL"
+    );
+
+    console.log(
+        `Puerto: ${PORT}`
+    );
+
+    console.log(
+        "WSS: /tunnel"
+    );
+
+    console.log(
+        "================================"
+    );
+
 });
