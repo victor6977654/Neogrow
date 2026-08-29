@@ -3,7 +3,7 @@ const WebSocket = require("ws");
 const crypto = require("crypto");
 
 const PORT = process.env.PORT || 10000;
-const TUNNEL_TOKEN = process.env.TUNNEL_TOKEN;
+const TUNNEL_TOKEN = "RDXZ-9f82Kx7LmP4Qz81-TUNNEL";
 
 let tunnel = null;
 const pending = new Map();
